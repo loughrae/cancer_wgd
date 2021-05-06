@@ -2,6 +2,7 @@
 library(TCGAutils)
 library(data.table)
 library(tidyverse)
+options(scipen = 999) #without this bedtools complains about the occasional scientific notation...Don't know why really...
 
 #### Import GDC metadata ####
 
@@ -26,8 +27,8 @@ codes <- UUIDtoBarcode(aliquots, from_type = 'aliquot_ids') #11104 rows
 
 codes <- codes %>%
   separate(col = 'portions.analytes.aliquots.submitter_id', into = c('TCGA', 'TSS', 'Individual', 'Sample', 'Portion', 'Plate', 'Center'), sep = '-', remove = FALSE) %>%
-  mutate(Patient = paste(TCGA, TSS, Individual)) %>%
-  mutate(Specimen = paste(Patient, Sample)) %>%
+  mutate(Patient = paste(TCGA, TSS, Individual, sep = '-')) %>%
+  mutate(Specimen = paste(Patient, Sample, sep = '-')) %>%
   separate(col = Sample, into = c('Sample.Type', 'Vial'), sep = 2) #11104 rows
 
 #### Filter ASCAT samples ####
@@ -37,13 +38,16 @@ filtered_codes <- codes %>%
     filter(!Patient %in% ascat_exclus) %>% 
     filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  
     arrange(Vial, desc(Plate), Portion) %>%  
+    left_join(meta, by = c('Patient')) %>%
     distinct(Patient, .keep_all = TRUE)  
 
 filtered_ascat <- ascat %>%
   filter(!Chromosome %in% c('chrX', 'chrY')) %>% #remove sex chromosomes
   filter(GDC_Aliquot %in% filtered_codes$portions.analytes.aliquots.aliquot_id) %>% #keep only preferred samples
+  mutate_at(c('Start', 'End', 'Copy_Number', 'Major_Copy_Number', 'Minor_Copy_Number'), as.numeric)  %>%
   left_join(filtered_codes, by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) #get barcodes
-write.table('filtered_ascat.txt', sep = '\t', col.names = T, row.names = F, quote = F)
+
+write.table(filtered_ascat, 'filtered_ascat.txt', sep = '\t', col.names = T, row.names = F, quote = F) #10346 samples 
 
 #### BED format ####
 
@@ -52,8 +56,22 @@ filtered_ascat %>%
   mutate(Start = Start - 1) %>%
   write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
 
+#### Sample Ploidy ####
+
+sample_avg = filtered_ascat %>%
+  mutate(len = (End - Start) + 1) %>%
+  mutate(prod = len * Copy_Number) %>%
+  group_by(GDC_Aliquot, proj) %>%
+  summarize(mean_CN = sum(prod)/sum(len)) 
+
+ggplot(sample_avg, aes(x = mean_CN, fill = proj)) + geom_density() + facet_wrap(~proj, scales = 'free_y') + theme(legend.position = 'none') + ylab('') + ggtitle('Sample Ploidy') + labs(subtitle = 'ASCAT Copy Number data from GDC')
+ggsave('sample_average_ASCAT.png') 
+ggplot(sample_avg, aes(x = mean_CN)) + geom_density() + ylab('') + ggtitle('Sample Ploidy (All Cancers)') + labs(subtitle = 'ASCAT Copy Number data from GDC')
+ggsave('sample_average_ASCAT_pancancer.png') 
+write.table(sample_avg, file = 'sample_average_ploidy_ASCAT.txt', sep = '\t', quote = F, col.names = T, row.names = F)
 
 
+  
 
 
   
