@@ -24,7 +24,7 @@ ascat <- fread('~/cat_all_AS.txt', header = TRUE) %>%
 aliquots <- unique(ascat$GDC_Aliquot) #11104 rows
 codes <- UUIDtoBarcode(aliquots, from_type = 'aliquot_ids') #11104 rows
 
-aliquots <- codes %>%
+codes <- codes %>%
   separate(col = 'portions.analytes.aliquots.submitter_id', into = c('TCGA', 'TSS', 'Individual', 'Sample', 'Portion', 'Plate', 'Center'), sep = '-', remove = FALSE) %>%
   mutate(Patient = paste(TCGA, TSS, Individual)) %>%
   mutate(Specimen = paste(Patient, Sample)) %>%
@@ -36,11 +36,24 @@ filtered_codes <- codes %>%
     filter(Sample.Type %in% c('01', '03', '09')) %>% #remove metastatic and recurrent; keep solid primary tumour and primary blood cancers
     filter(!Patient %in% ascat_exclus) %>% 
     filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  
-    arrange(Vial, desc(Plate), Portion, by.group = TRUE) %>%  
+    arrange(Vial, desc(Plate), Portion) %>%  
     distinct(Patient, .keep_all = TRUE)  
-  return(asc) 
-} 
 
-filters <- filter_barcodes()
+filtered_ascat <- ascat %>%
+  filter(!Chromosome %in% c('chrX', 'chrY')) %>% #remove sex chromosomes
+  filter(GDC_Aliquot %in% filtered_codes$portions.analytes.aliquots.aliquot_id) %>% #keep only preferred samples
+  left_join(filtered_codes, by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) #get barcodes
+write.table('filtered_ascat.txt', sep = '\t', col.names = T, row.names = F, quote = F)
+
+#### BED format ####
+
+filtered_ascat %>%
+  select(Chromosome, Start, End, GDC_Aliquot, Copy_Number) %>% 
+  mutate(Start = Start - 1) %>%
+  write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+
+
+
+
 
   
