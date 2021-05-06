@@ -21,23 +21,19 @@ ascat <- fread('~/cat_all_AS.txt', header = TRUE) %>%
   filter(GDC_Aliquot != 'GDC_Aliquot')
 
 #convert UUIDs to barcodes using TCGAutils to query GDC (?)
-aliquots <- unique(ascat$GDC_Aliquot)
+aliquots <- unique(ascat$GDC_Aliquot) #11104 rows
 codes <- UUIDtoBarcode(aliquots, from_type = 'aliquot_ids') #11104 rows
 
 aliquots <- codes %>%
-  left_join(codes, by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) %>%
-  separate(col = 'portions.analytes.aliquots.aliquot_id', into = c('TCGA', 'TSS', 'Individual', 'Sample', 'Portion', 'Plate', 'Center'), sep = '-', remove = FALSE) %>%
+  separate(col = 'portions.analytes.aliquots.submitter_id', into = c('TCGA', 'TSS', 'Individual', 'Sample', 'Portion', 'Plate', 'Center'), sep = '-', remove = FALSE) %>%
   mutate(Patient = paste(TCGA, TSS, Individual)) %>%
   mutate(Specimen = paste(Patient, Sample)) %>%
-  separate(col = Sample, into = c('Sample.Type', 'Vial'), sep = 2) %>%
-  distinct(GDC_Aliquot)
-
+  separate(col = Sample, into = c('Sample.Type', 'Vial'), sep = 2) #11104 rows
 
 #### Filter ASCAT samples ####
 
-filter_barcodes <- function(df) { 
-  asc <- df %>% 
-    filter(Sample.Type %in% c('01', '03', '09')) %>% #remove metastatic and recurrent 
+filtered_codes <- codes %>%
+    filter(Sample.Type %in% c('01', '03', '09')) %>% #remove metastatic and recurrent; keep solid primary tumour and primary blood cancers
     filter(!Patient %in% ascat_exclus) %>% 
     filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  
     arrange(Vial, desc(Plate), Portion, by.group = TRUE) %>%  
