@@ -49,12 +49,6 @@ filtered_ascat <- ascat %>%
 
 write.table(filtered_ascat, 'filtered_ascat.txt', sep = '\t', col.names = T, row.names = F, quote = F) #10346 samples 
 
-#### BED format ####
-
-filtered_ascat %>%
-  select(Chromosome, Start, End, GDC_Aliquot, Copy_Number) %>% 
-  mutate(Start = Start - 1) %>%
-  write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
 
 #### Sample Ploidy ####
 
@@ -71,6 +65,13 @@ ggsave('sample_average_ASCAT_pancancer.png')
 write.table(sample_avg, file = 'sample_average_ploidy_ASCAT.txt', sep = '\t', quote = F, col.names = T, row.names = F)
 
 
+#### BED format ####
+
+filtered_ascat %>%
+  mutate(Start = Start - 1) %>%
+  mutate(WGD = case_when(GDC_Aliquot %in% sample_avg[sample_avg$mean_CN >= 2.7,]$GDC_Aliquot ~ 1, TRUE ~ 0)) %>%
+  dplyr::select(Chromosome, Start, End, Copy_Number, proj, WGD) %>%
+  write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
   
 
 
