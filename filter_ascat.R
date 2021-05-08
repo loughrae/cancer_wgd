@@ -70,7 +70,8 @@ write.table(sample_avg, file = 'sample_average_ploidy_ASCAT.txt', sep = '\t', qu
 filtered_ascat %>%
   mutate(Start = Start - 1) %>%
   mutate(WGD = case_when(GDC_Aliquot %in% sample_avg[sample_avg$mean_CN >= 2.7,]$GDC_Aliquot ~ 1, TRUE ~ 0)) %>%
-  dplyr::select(Chromosome, Start, End, Copy_Number, proj, WGD) %>%
+  mutate(sample_info = paste(Copy_Number, proj, WGD, sep = '_')) %>%
+  dplyr::select(Chromosome, Start, End, sample_info, Copy_Number) %>%
   write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
   
 
