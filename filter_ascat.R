@@ -2,12 +2,12 @@
 library(TCGAutils)
 library(data.table)
 library(tidyverse)
-options(scipen = 999) #without this bedtools complains about the occasional scientific notation...Don't know why really...
+options(scipen = 999) #without this bedtools complains about the occasional scientific notation
 
 #### Import GDC metadata ####
 
 meta <- read.table('GDCquery_results_allcancers.txt', header = TRUE)
-ffpe <- read.table('ffpe.txt', header = TRUE)
+ffpe <- read.table('ffpe.txt', header = TRUE, sep = '\t')
 
 #### Recommended exclusions by ASCAT team ####
 
@@ -19,7 +19,7 @@ ascat_exclus <- gsub(',', '', trimws(scan(text = ascat_exclus, what = ',')))
 #### Import and format combined ASCAT segment data ####
 
 ascat <- fread('~/cat_all_AS.txt', header = TRUE) %>%
-  filter(GDC_Aliquot != 'GDC_Aliquot')
+  filter(GDC_Aliquot != 'GDC_Aliquot') #remove interspersed headers from cat
 
 #convert UUIDs to barcodes using TCGAutils to query GDC (?)
 aliquots <- unique(ascat$GDC_Aliquot) #11104 rows
@@ -36,15 +36,15 @@ codes <- codes %>%
 filtered_codes <- codes %>%
     filter(Sample.Type %in% c('01', '03', '09')) %>% #remove metastatic and recurrent; keep solid primary tumour and primary blood cancers
     filter(!Patient %in% ascat_exclus) %>% 
-    filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  
-    arrange(Vial, desc(Plate), Portion) %>%  
+    filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  #remove FFPE samples
+    arrange(Vial, desc(Plate), Portion) %>%  #Plate is sorted in descending order according to standard
     left_join(meta, by = c('Patient')) %>%
     distinct(Patient, .keep_all = TRUE)  
 
 filtered_ascat <- ascat %>%
   filter(!Chromosome %in% c('chrX', 'chrY')) %>% #remove sex chromosomes
   filter(GDC_Aliquot %in% filtered_codes$portions.analytes.aliquots.aliquot_id) %>% #keep only preferred samples
-  mutate_at(c('Start', 'End', 'Copy_Number', 'Major_Copy_Number', 'Minor_Copy_Number'), as.numeric)  %>%
+  mutate_at(c('Start', 'End', 'Copy_Number', 'Major_Copy_Number', 'Minor_Copy_Number'), as.numeric)  %>% #convert these columns to numeric
   left_join(filtered_codes, by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) #get barcodes
 
 write.table(filtered_ascat, 'filtered_ascat.txt', sep = '\t', col.names = T, row.names = F, quote = F) #10346 samples 
@@ -55,8 +55,9 @@ write.table(filtered_ascat, 'filtered_ascat.txt', sep = '\t', col.names = T, row
 sample_avg = filtered_ascat %>%
   mutate(len = (End - Start) + 1) %>%
   mutate(prod = len * Copy_Number) %>%
-  group_by(GDC_Aliquot, proj) %>%
+  group_by(GDC_Aliquot, cases, proj) %>%
   summarize(mean_CN = sum(prod)/sum(len)) 
+sample_avg$index <- 1:nrow(sample_avg)
 
 ggplot(sample_avg, aes(x = mean_CN, fill = proj)) + geom_density() + facet_wrap(~proj, scales = 'free_y') + theme(legend.position = 'none') + ylab('') + ggtitle('Sample Ploidy') + labs(subtitle = 'ASCAT Copy Number data from GDC')
 ggsave('sample_average_ASCAT.png') 
@@ -69,11 +70,22 @@ write.table(sample_avg, file = 'sample_average_ploidy_ASCAT.txt', sep = '\t', qu
 
 filtered_ascat %>%
   mutate(Start = Start - 1) %>%
-  mutate(WGD = case_when(GDC_Aliquot %in% sample_avg[sample_avg$mean_CN >= 2.7,]$GDC_Aliquot ~ 1, TRUE ~ 0)) %>%
-  mutate(sample_info = paste(Copy_Number, proj, WGD, sep = '_')) %>%
+  left_join(sample_avg, by = c('GDC_Aliquot')) %>%
+  mutate(sample_info = paste(Copy_Number, proj.x, round(mean_CN,3), sep = '_')) %>%
   dplyr::select(Chromosome, Start, End, sample_info, Copy_Number) %>%
   write.table(file = 'ascat_filtered.bed', quote = F, col.names = F, row.names = F, sep = '\t')
   
+
+#### Make bed file with binary-encoded CN, recoded sample ID, and only WGD samples ####
+
+filtered_ascat %>%
+  mutate(Start = Start - 1) %>%
+  left_join(sample_avg, by = c('GDC_Aliquot')) %>%
+  mutate(sample_info = paste(Copy_Number, proj.x, round(mean_CN,3), sep = '_')) %>%
+  filter(mean_CN >= 2.7) %>%
+  dplyr::select(Chromosome, Start, End, index, Copy_Number) %>%
+  mutate(Copy_Number = ifelse(Copy_Number >= 3, 1, 0)) %>%
+  write.table(file = 'ascat_filtered_binary.bed', quote = F, col.names = F, row.names = F, sep = '\t')
 
 
   
