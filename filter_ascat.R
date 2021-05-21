@@ -58,6 +58,7 @@ sample_avg = filtered_ascat %>%
   group_by(GDC_Aliquot, cases, proj) %>%
   summarize(mean_CN = sum(prod)/sum(len)) 
 sample_avg$index <- 1:nrow(sample_avg)
+sample_avg$ploidy <- sample_avg$mean_CN
 
 ggplot(sample_avg, aes(x = mean_CN, fill = proj)) + geom_density() + facet_wrap(~proj, scales = 'free_y') + theme(legend.position = 'none') + ylab('') + ggtitle('Sample Ploidy') + labs(subtitle = 'ASCAT Copy Number data from GDC')
 ggsave('sample_average_ASCAT.png') 
@@ -84,8 +85,8 @@ filtered_ascat %>%
   mutate(sample_info = paste(Copy_Number, proj.x, round(mean_CN,3), sep = '_')) %>%
   filter(mean_CN >= 2.7) %>%
   dplyr::select(Chromosome, Start, End, index, Copy_Number) %>%
-  mutate(Copy_Number = ifelse(Copy_Number >= 3, 1, 0)) %>%
-  write.table(file = 'ascat_filtered_binary.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+  #mutate(Copy_Number = ifelse(Copy_Number >= 4, 1, 0)) %>% #NB!!!!
+  write.table(file = 'ascat_filtered_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
 
 
   
