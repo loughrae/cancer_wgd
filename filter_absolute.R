@@ -23,7 +23,7 @@ absamples <- fread('TCGA_mastercalls.abs_tables_JSedit.fixed.txt')
 absamples_filtered <- absamples %>% 
   clean_names() %>%
   filter(call_status == 'called') %>%
-  filter(genome_doublings == 1) %>% 
+  #filter(genome_doublings == 1) %>% 
   separate(sample, into = c('TCGA', 'TSS', 'Individual', 'Sample', 'Portion', 'Plate', 'Center'), sep = '-', remove = FALSE) %>%
   separate(Sample, into = c('Sample.Type', 'Vial'), remove = FALSE, sep = 2) %>%
   mutate(Patient = paste(TCGA, TSS, Individual, sep = '-')) %>%
@@ -34,18 +34,37 @@ absamples_filtered <- absamples %>%
   arrange(Vial, desc(Plate), Portion) %>% 
   distinct(Patient, .keep_all = TRUE) 
 
+write.table(absamples_filtered, 'absolute_samples_WGD_filtered.txt', sep = '\t', col.names = T, row.names = F, quote = F)
+absamples_filtered$samplename <- absamples_filtered$array
+
+
+
 filtered_absolute <- absolute %>%
   filter(Chromosome %in% 1:22) %>%
   filter(Sample %in% absamples_filtered$array) %>%
   mutate(Chromosome = paste0('chr', Chromosome)) %>%
   left_join(absamples_filtered, by = c('Sample' = 'array')) #635283
 
-write.table(filtered_ascat, 'filtered_absolute_WGD.txt', sep = '\t', col.names = T, row.names = F, quote = F) #2883 samples
+write.table(filtered_absolute, 'filtered_absolute_WGD.txt', sep = '\t', col.names = T, row.names = F, quote = F) #2883 samples
 
-filtered_ascat %>%
+filtered_absolute %>%
+  filter(genome_doublings == 1)%>%
   mutate(Start = Start - 1) %>%
   dplyr::select(Chromosome, Start, End, Sample, Modal_Total_CN) %>%
-  write.table(file = 'ascat_filtered_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+  write.table(file = 'absolute_filtered_WGD_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+
+
+filtered_absolute %>%
+  filter(genome_doublings == 0) %>%
+  mutate(Start = Start - 1) %>%
+  dplyr::select(Chromosome, Start, End, Sample, Modal_Total_CN) %>%
+  write.table(file = 'absolute_filtered_diploid_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+
+
+#time bedtools map -a genes_hg19_sorted.bed -b absolute_filtered_diploid_CN_sorted.bed -c 5,5,5,5,5,5 -o mean,median,min,max,count,stdev -f 0.9 -null -999 > mapped_hg19_absolute_diploid.bed
+
+
+
 
 
 
