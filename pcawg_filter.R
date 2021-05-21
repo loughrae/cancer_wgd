@@ -9,9 +9,10 @@ gn <- gn[, -c('Locus ID','Cytoband')] %>%
   as.data.frame() %>%
   separate(col = 1, into = c('Gene', 'Chr'), sep = '\\|', fill = 'right', remove = TRUE) %>%
   distinct(Gene, .keep_all = TRUE) %>%
-  left_join(genes[, c('chromosome_name', 'external_gene_name')], by = c('Gene' = 'external_gene_name')) %>%
+  left_join(genes, by = c('Gene' = 'external_gene_name')) %>%
   filter(chromosome_name %in% 1:22) %>% #no sex chrs
-  dplyr::select(-c(chromosome_name, Chr))
+  dplyr::select(-c(chromosome_name, Chr, Gene)) %>%
+  dplyr::select(!start_position:copyconserved)
 
 #samples <- gn %>% dplyr::select(contains('-')) %>% colnames()
 
@@ -39,12 +40,12 @@ include <- samples %>%
 
 filt_samples <- include$Sample
 all.equal(include$Sample, unique(include$Sample))
-gn <- gn %>% select(Gene, all_of(filt_samples))
+gn <- gn %>% select(ensembl_gene_id, all_of(filt_samples))
 
-long <- pivot_longer(gn, cols = !Gene, names_to = 'Sample', values_to = 'CN') %>%
+long <- pivot_longer(gn, cols = !ensembl_gene_id, names_to = 'Sample', values_to = 'CN') %>%
   filter(!is.na(CN)) %>%
   left_join(sam, by = c('Sample' = 'aliquot_id')) %>% 
-  dplyr::select(Gene, Sample, CN, donor_unique_id, cancer, dcc_specimen_type) %>%
+  dplyr::select(ensembl_gene_id, Sample, CN, donor_unique_id, cancer, dcc_specimen_type) %>%
   left_join(ploi, by = c('Sample' = 'samplename')) %>%
   dplyr::select(-purity_conf_mad, -wgd_uncertain) 
 
