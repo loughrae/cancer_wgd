@@ -3,6 +3,7 @@ args = commandArgs(trailingOnly = TRUE)
 library(data.table)
 library(tidyverse)
 library(ggpubr)
+library(qs)
 
 long <- fread(args[1])
 sourcename <- args[2]
@@ -29,13 +30,19 @@ retain <- function(hh, number, source) {
   print(number)
   df <-  hh %>% group_by(ohno, Sample) %>% summarize(total = n(), nums = length(Copy_Number[Copy_Number >= number]), perc = length(Copy_Number[Copy_Number >= number])/n() , exact = length(Copy_Number[Copy_Number == number])/n()) %>% mutate(percent = nums/total) %>%
     mutate(Ohnolog = ifelse(ohno == T, 'Ohnolog', 'Non-Ohnolog')) %>%
-    left_join(samp_means, by = c('Sample' = 'samplename')) #pcawg already has ploidy col
-  ggplot(df, aes(x = ploidy, y = percent, colour = Ohnolog)) + geom_point() + facet_wrap(~Ohnolog) + scale_x_reverse() + xlab('Sample mean copy number') + ylab(paste0('Proportion of genes in at least ', number, ' copies')) + theme(legend.position = 'none')
-  ggsave(paste0('decreasing_ploidy_atleast_', number, '_', source, '.png'), width = 20, height = 15)
+    left_join(samp_means, by = c('Sample' = 'samplename')) 
+  p1 <- ggplot(df, aes(x = ploidy, y = percent, colour = Ohnolog)) + geom_point() + facet_wrap(~Ohnolog) + scale_x_reverse() + xlab('Sample mean copy number') + ylab(paste0('Proportion of genes in at least ', number, ' copies')) + theme(legend.position = 'none')
+  ggsave(p1, file = paste0('decreasing_ploidy_atleast_', number, '_', source, '.png'), width = 20, height = 15)
   ggplot(df, aes(x = ploidy, y = exact, colour = Ohnolog)) + geom_point() + facet_wrap(~Ohnolog) + scale_x_reverse() + xlab('Sample mean copy number') + ylab(paste0('Proportion of genes in exactly ', number, ' copies')) + theme(legend.position = 'none')
   ggsave(paste0('decreasing_ploidy_exactly_', number, '_', source, '.png'), width = 20, height = 15)
-  ggplot(df, aes(x = as.factor(Ohnolog), y = percent, fill = as.factor(Ohnolog))) + geom_boxplot() + stat_compare_means() + xlab('Gene Type') + ylab(paste0('Proportion of genes in at least ', number, ' copies')) + theme(legend.position = 'none')
-  ggsave(paste0('boxplot_atleast_', number, '_', source, '.png'))
+  p2 <- ggplot(df, aes(x = as.factor(Ohnolog), y = percent, fill = as.factor(Ohnolog))) + geom_boxplot() + stat_compare_means() + xlab('Gene Type') + ylab(paste0('Proportion of genes in at least ', number, ' copies')) + theme(legend.position = 'none')
+  ggsave(p2, file = paste0('boxplot_atleast_', number, '_', source, '.png'))
+ qsave(p1, file = paste0('decreasing_ploidy_atleast_', number, '_', source, '.qs'))
+ qsave(p2, file = paste0('boxplot_atleast_', number, '_', source, '.qs'))
+  d2 <- hh %>% group_by(ohno, ensembl_gene_id) %>% summarize(total = n(), nums = length(Copy_Number[Copy_Number >= number]), perc = length(Copy_Number[Copy_Number >= number])/n() , exact = length(Copy_Number[Copy_Number == number])/n()) %>% mutate(percent = nums/total) %>%
+    mutate(Ohnolog = ifelse(ohno == T, 'Ohnolog', 'Non-Ohnolog'))
+  p3 <- ggplot(d2, aes(x = Ohnolog, y = perc, fill = Ohnolog)) + geom_boxplot() + stat_compare_means() + theme(legend.position = 'none')
+  ggsave(p3, file = paste0('boxplot_genecentred_', number, '_', source, '.png'))
   return(df)
 }
 

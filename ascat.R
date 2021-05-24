@@ -25,5 +25,21 @@ ffpe <- lapply(projs, FUN = GDCquery_clinic, 'biospecimen') %>%
   write.table(ffpe, 'ffpe.txt', col.names = T, row.names = F, quote = F, sep= '\t')
 
 
+#### Download gene-level copy number data ####
+  
+glcn <- GDCquery(project = projs, data.category = 'Copy Number Variation', workflow.type = 'ASCAT2')
+extract_glcn <- glcn$results[[1]] %>% filter(data_type == 'Gene Level Copy Number')
+glcn$results[[1]] <- extract_glcn #guess i already did know how to use subassignment
+GDCdownload(glcn)
 
+#### Use TCGAutils to connect filename --> case --> aliquot
 
+all_files <- list.files(path = "/home/elle/PhD/cancer_wgd/GDCdata/", recursive = TRUE) #22208
+glcn_files <- all_files[grep('gene_level_copy_number.tsv', all_files)] %>% #11104 
+  as.data.frame() %>%
+  separate(col = 1, sep = '/', into = c('Cancer', 'harmonized', 'CNV', 'GLCN', 'folder', 'file'), remove = FALSE) 
+
+cases <- filenameToBarcode(glcn_files$file, legacy = FALSE) #22208
+aliquots <- barcodeToUUID(cases$aliquots.submitter_id)
+
+glcn_files <- glcn_files %>% left_join(aliquots, by = c('file' = 'file_name')) 

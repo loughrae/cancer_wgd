@@ -59,6 +59,7 @@ sample_avg = filtered_ascat %>%
   summarize(mean_CN = sum(prod)/sum(len)) 
 sample_avg$index <- 1:nrow(sample_avg)
 sample_avg$ploidy <- sample_avg$mean_CN
+sample_avg$samplename <- sample_avg$index
 
 ggplot(sample_avg, aes(x = mean_CN, fill = proj)) + geom_density() + facet_wrap(~proj, scales = 'free_y') + theme(legend.position = 'none') + ylab('') + ggtitle('Sample Ploidy') + labs(subtitle = 'ASCAT Copy Number data from GDC')
 ggsave('sample_average_ASCAT.png') 
@@ -79,14 +80,25 @@ filtered_ascat %>%
 
 #### Make bed file with binary-encoded CN, recoded sample ID, and only WGD samples ####
 
-filtered_ascat %>%
+filtered_ascat_bed <- filtered_ascat %>%
   mutate(Start = Start - 1) %>%
   left_join(sample_avg, by = c('GDC_Aliquot')) %>%
-  mutate(sample_info = paste(Copy_Number, proj.x, round(mean_CN,3), sep = '_')) %>%
+  mutate(sample_info = paste(Copy_Number, proj.x, round(mean_CN,3), sep = '_')) 
+
+filtered_ascat_bed %>%
   filter(mean_CN >= 2.7) %>%
   dplyr::select(Chromosome, Start, End, index, Copy_Number) %>%
-  #mutate(Copy_Number = ifelse(Copy_Number >= 4, 1, 0)) %>% #NB!!!!
-  write.table(file = 'ascat_filtered_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+  fwrite(file = 'ascat_filtered_WGD.bed', sep = '\t', col.names = F, row.names = F, quote = F)
+
+filtered_ascat_bed %>%
+  filter(mean_CN < 2.7) %>%
+  dplyr::select(Chromosome, Start, End, index, Copy_Number) %>%
+  fwrite(file = 'ascat_filtered_diploid.bed', sep = '\t', col.names = F, row.names = F, quote = F)
+  
+filtered_ascat_bed %>%
+  dplyr::select(Chromosome, Start, End, index, Copy_Number) %>%
+  fwrite(file = 'ascat_filtered_all.bed', sep = '\t', col.names = F, row.names = F, quote = F)
+  
 
 
   
