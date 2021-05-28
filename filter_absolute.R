@@ -34,8 +34,8 @@ absamples_filtered <- absamples %>%
   arrange(Vial, desc(Plate), Portion) %>% 
   distinct(Patient, .keep_all = TRUE) 
 
-write.table(absamples_filtered, 'absolute_samples_WGD_filtered.txt', sep = '\t', col.names = T, row.names = F, quote = F)
 absamples_filtered$samplename <- absamples_filtered$array
+write.table(absamples_filtered, 'absolute_samples_filtered.txt', sep = '\t', col.names = T, row.names = F, quote = F)
 
 
 
@@ -45,25 +45,27 @@ filtered_absolute <- absolute %>%
   mutate(Chromosome = paste0('chr', Chromosome)) %>%
   left_join(absamples_filtered, by = c('Sample' = 'array')) #635283
 
-write.table(filtered_absolute, 'filtered_absolute_WGD.txt', sep = '\t', col.names = T, row.names = F, quote = F) #2883 samples
+fwrite(filtered_absolute, 'filtered_absolute_WGD.txt', sep = '\t', col.names = T, row.names = F, quote = F) #2883 samples
 
-filtered_absolute %>%
-  filter(genome_doublings == 1)%>%
-  mutate(Start = Start - 1) %>%
+
+
+filtered_absolute_bed <- filtered_absolute %>%
+  mutate(Start = Start - 1) 
+  
+
+filtered_absolute_bed %>%
+  filter(genome_doublings == 1) %>%
   dplyr::select(Chromosome, Start, End, Sample, Modal_Total_CN) %>%
-  write.table(file = 'absolute_filtered_WGD_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+  fwrite(file = 'absolute_filtered_WGD.bed', sep = '\t', col.names = F, row.names = F, quote = F)
 
-
-filtered_absolute %>%
+filtered_absolute_bed %>%
   filter(genome_doublings == 0) %>%
-  mutate(Start = Start - 1) %>%
   dplyr::select(Chromosome, Start, End, Sample, Modal_Total_CN) %>%
-  write.table(file = 'absolute_filtered_diploid_CN.bed', quote = F, col.names = F, row.names = F, sep = '\t')
+  fwrite(file = 'absolute_filtered_diploid.bed', sep = '\t', col.names = F, row.names = F, quote = F)
 
-
-#time bedtools map -a genes_hg19_sorted.bed -b absolute_filtered_diploid_CN_sorted.bed -c 5,5,5,5,5,5 -o mean,median,min,max,count,stdev -f 0.9 -null -999 > mapped_hg19_absolute_diploid.bed
-
-
+filtered_absolute_bed %>%
+  dplyr::select(Chromosome, Start, End, Sample, Modal_Total_CN) %>%
+  fwrite(file = 'absolute_filtered_all.bed', sep = '\t', col.names = F, row.names = F, quote = F)
 
 
 

@@ -47,10 +47,11 @@ long <- pivot_longer(gn, cols = !ensembl_gene_id, names_to = 'Sample', values_to
   left_join(sam, by = c('Sample' = 'aliquot_id')) %>% 
   dplyr::select(ensembl_gene_id, Sample, CN, donor_unique_id, cancer, dcc_specimen_type) %>%
   left_join(ploi, by = c('Sample' = 'samplename')) %>%
-  dplyr::select(-purity_conf_mad, -wgd_uncertain) 
+  dplyr::select(-purity_conf_mad, -wgd_uncertain) %>%
+  mutate(Copy_Number = CN)
 
 fwrite(long, file = 'pcawg_long.txt', sep = '\t', col.names = T, row.names = F, quote = F)
-
+fwrite(long[long$wgd_status == 'wgd',], file = 'pcawg_long_wgd.txt', sep = '\t', col.names = T, row.names = F, quote = F)
 NROW(unique(long$Sample)) #2349
 NROW(unique(long$donor_unique_id)) #2349
 
@@ -58,7 +59,25 @@ NROW(unique(long$donor_unique_id)) #2349
 
 
 
-sample_means <- long %>% group_by(cancer, Sample) %>% summarize(mean = mean(CN, na.rm = T), med = median(CN, na.rm = T), std = sd(CN, na.rm = T))
+sample_means <- long %>% group_by(cancer, Sample) %>% summarize(mean = mean(CN, na.rm = T), med = median(CN, na.rm = T), std = sd(CN, na.rm = T), ploidy = mean(CN, na.rm = T))
+sample_means$samplename = sample_means$Sample
 samples_plot <- ggplot(sample_means, aes(x = mean)) + geom_density() + facet_wrap(~cancer, scales = 'free_y') + xlab('Mean Gene Copy Number') + ylab('Density (independent y scales)') + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) + ggtitle('Mean Copy Number of PCAWG Samples')
 ggsave(samples_plot, file = 'sample_means_plot.png')
 write.table(sample_means, file = 'pcawg_sample_means.txt', sep = '\t', quote = F, col.names = T, row.names = F)
+
+long %>% filter(wgd_status == 'no_wgd') %>% group_by(ensembl_gene_id) %>% 
+  summarize(mean = mean(CN, na.rm = T), med = median(CN, na.rm = T), stdev = sd(CN, na.rm = T), min = min(CN, na.rm = T), max = max(CN, na.rm = T), count = n()) %>% 
+  mutate(chromosome_name = 'chromosome_placeholder', start_position = 'start_placeholder', end_position = 'end_placeholder') %>% 
+  dplyr::select(chromosome_name, start_position, end_position, ensembl_gene_id, mean, med, stdev, min, max, count) %>%
+  fwrite(file = 'mapped_pcawg_diploid.bed', col.names = F, row.names = F, quote = F, sep = '\t')
+
+
+long %>% 
+  group_by(ensembl_gene_id) %>% 
+  summarize(mean = mean(CN, na.rm = T), med = median(CN, na.rm = T), stdev = sd(CN, na.rm = T), min = min(CN, na.rm = T), max = max(CN, na.rm = T), count = n()) %>% 
+  mutate(chromosome_name = 'chromosome_placeholder', start_position = 'start_placeholder', end_position = 'end_placeholder') %>% 
+  dplyr::select(chromosome_name, start_position, end_position, ensembl_gene_id, mean, med, stdev, min, max, count) %>%
+  fwrite(file = 'mapped_pcawg_all.bed', col.names = F, row.names = F, quote = F, sep = '\t')
+
+
+  

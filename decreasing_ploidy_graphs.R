@@ -26,6 +26,10 @@ uniq_oh <- unique(oh)
 
 long$ohno <- ifelse(long$ensembl_gene_id %in% uniq_oh, T, F)
 
+long %>% group_by(ohno, ensembl_gene_id) %>% 
+  summarize(total = n(), fours = length(Copy_Number[Copy_Number >= 4]), perc4 = length(Copy_Number[Copy_Number >= 4])/n(), perc3 = length(Copy_Number[Copy_Number >= 3])/n(), exact4 = length(Copy_Number[Copy_Number == 4])/n()) %>%
+  fwrite(paste0('genecentric_retention_', sourcename, '.txt'))
+
 retain <- function(hh, number, source) {
   print(number)
   df <-  hh %>% group_by(ohno, Sample) %>% summarize(total = n(), nums = length(Copy_Number[Copy_Number >= number]), perc = length(Copy_Number[Copy_Number >= number])/n() , exact = length(Copy_Number[Copy_Number == number])/n()) %>% mutate(percent = nums/total) %>%

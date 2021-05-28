@@ -6,7 +6,7 @@ library(data.table)
 ### annotations ####
 classB <- read.table('~/Downloads/ClassBGenes.txt')
 
-ohnos <- read.table('~/Downloads/strict_ohnologs_full.csv', sep = '\t', header = T) #not actually comma-separated
+ohnos <- read.table('~/Downloads/relaxed_ohnologs_full.csv', sep = '\t', header = T) #not actually comma-separated. NOTE RELAXED OHNOLOGS NOW!
 oh <- unlist(ohnos)
 uniq_oh <- unique(oh)
 
@@ -34,6 +34,7 @@ geneset <- function(hg) {
     mutate(DBO = case_when(ensembl_gene_id %in% DBOs$V1 ~ 'DBO', TRUE ~ 'Non-DBO')) %>%
     mutate(copyconserved = case_when(ensembl_gene_id %in% conserved ~ 'Conserved', TRUE ~ 'Not Conserved'))
   write.table(genes, file = paste0('genes_', hg, '.tsv'), row.names = F, col.names = T, quote = F, sep = '\t')
+  write.table(genes$ensembl_gene_id, file = paste0('geneIDs_', hg, '.tsv'), row.names = F, col.names = F, quote = F, sep = '\t')
   
   genes %>% 
     mutate(chromosome_name = paste0('chr', chromosome_name)) %>%
